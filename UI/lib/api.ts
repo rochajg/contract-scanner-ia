@@ -1,4 +1,75 @@
+export interface AuthResponse {
+  token: string
+  user_id: string
+  username: string
+}
+
+export async function loginUser(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || "Falha ao fazer login")
+  }
+  return res.json()
+}
+
+export async function registerUser(
+  username: string,
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  const res = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || "Falha ao criar conta")
+  }
+  return res.json()
+}
+
+function getAuthHeaders(): HeadersInit {
+  if (typeof window === "undefined") return {}
+  const token = localStorage.getItem("auth_token")
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export type RiskLevel = "low" | "medium" | "high"
+
+export interface AnalysisSummary {
+  id: string
+  filename: string | null
+  status: "UPLOADED" | "PROCESSING" | "COMPLETED" | "FAILED"
+  created_at: string
+  completed_at: string | null
+  result?: AnalysisResult
+}
+
+export async function deleteAnalysis(id: string): Promise<void> {
+  const res = await fetch(`/api/analyses/${id}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeaders() },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || "Falha ao excluir análise")
+  }
+}
+
+export async function listAnalyses(): Promise<AnalysisSummary[]> {
+  const res = await fetch("/api/analyses", {
+    headers: { ...getAuthHeaders() },
+  })
+  if (!res.ok) throw new Error("Falha ao listar análises")
+  const body = await res.json()
+  return body.analyses ?? []
+}
 
 export interface Party {
   name: string
@@ -95,9 +166,8 @@ export interface AnalysisResult {
   analysis_warnings?: string[]
 }
 
-interface PresignResponse {
+interface UploadResponse {
   analysis_id: string
-  upload_url: string
   s3_key: string
 }
 
@@ -107,42 +177,28 @@ interface ProcessResponse {
   result: AnalysisResult
 }
 
-async function presignUpload(file: File): Promise<PresignResponse> {
-  const res = await fetch("/api/uploads/presign", {
+async function uploadPDF(file: File): Promise<UploadResponse> {
+  const form = new FormData()
+  form.append("file", file)
+
+  const res = await fetch("/api/uploads", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      filename: file.name,
-      content_type: file.type || "application/pdf",
-      size_bytes: file.size,
-    }),
+    headers: { ...getAuthHeaders() },
+    body: form,
   })
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || "Falha ao preparar upload")
+    throw new Error(body.error || "Falha ao enviar arquivo")
   }
 
   return res.json()
 }
 
-async function uploadToS3(uploadUrl: string, file: File): Promise<void> {
-  const res = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "application/pdf" },
-    body: file,
-  })
-
-  if (!res.ok) {
-    throw new Error("Falha ao enviar arquivo para o S3")
-  }
-}
-
 async function processAnalysis(analysisId: string): Promise<ProcessResponse> {
   const res = await fetch(`/api/analyses/${analysisId}/process`, {
     method: "POST",
+    headers: { ...getAuthHeaders() },
   })
 
   if (!res.ok) {
@@ -153,17 +209,14 @@ async function processAnalysis(analysisId: string): Promise<ProcessResponse> {
   return res.json()
 }
 
-export type AnalysisStep = "presigning" | "uploading" | "processing"
+export type AnalysisStep = "uploading" | "processing"
 
 export async function analyzeContract(
   file: File,
   onStepChange?: (step: AnalysisStep) => void
 ): Promise<AnalysisResult> {
-  onStepChange?.("presigning")
-  const { analysis_id, upload_url } = await presignUpload(file)
-
   onStepChange?.("uploading")
-  await uploadToS3(upload_url, file)
+  const { analysis_id } = await uploadPDF(file)
 
   onStepChange?.("processing")
   const { result } = await processAnalysis(analysis_id)

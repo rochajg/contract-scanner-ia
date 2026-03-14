@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Navbar } from "@/components/navbar"
 import { UploadArea } from "@/components/upload-area"
@@ -10,21 +11,29 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Loader2, ArrowRight, FileSearch } from "lucide-react"
 import { analyzeContract, type AnalysisResult, type AnalysisStep } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
 
 const stepLabels: Record<AnalysisStep, string> = {
-  presigning: "Preparando upload...",
   uploading: "Enviando arquivo...",
   processing: "Analisando contrato com IA...",
 }
 
 export default function HomePage() {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login")
+    }
+  }, [user, isLoading, router])
+
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showResult, setShowResult] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [step, setStep] = useState<AnalysisStep | null>(null)
-
   const handleAnalyze = useCallback(async () => {
     if (!file) return
     setIsAnalyzing(true)
@@ -100,13 +109,8 @@ export default function HomePage() {
                     </>
                   )}
                 </Button>
-                <button
-                  type="button"
-                  className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-                >
-                  Ver exemplo de relatório
-                </button>
               </div>
+
             </CardContent>
           </Card>
 
