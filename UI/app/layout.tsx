@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import { ClerkProvider } from '@clerk/nextjs'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
+import { Providers } from './providers'
 import './globals.css'
 
 const _inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -42,14 +42,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="pt-BR">
-        <body className="font-sans antialiased">
+    <html lang="pt-BR">
+      <body className="font-sans antialiased">
+        <Providers>
           {children}
           <Toaster position="top-right" richColors />
           <Analytics />
-        </body>
-      </html>
-    </ClerkProvider>
+        </Providers>
+      </body>
+    </html>
   )
 }
