@@ -119,16 +119,24 @@ export function ResultPreview({ isLoading, result }: ResultPreviewProps) {
 
       {/* Avisos de extração */}
       {analysis_warnings && analysis_warnings.length > 0 && (
-        <Card className="border-yellow-500/50 bg-yellow-500/5">
-          <CardContent className="flex flex-col gap-1 pt-4">
-            {analysis_warnings.map((w, i) => (
-              <p key={i} className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400">
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {w}
-              </p>
-            ))}
-          </CardContent>
-        </Card>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="warnings" className="rounded-lg border border-yellow-500/50 bg-yellow-500/5 px-4">
+            <AccordionTrigger className="py-3 text-xs font-medium text-yellow-700 hover:no-underline dark:text-yellow-400">
+              <span className="flex items-center gap-2">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                {analysis_warnings.length} aviso{analysis_warnings.length > 1 ? "s" : ""} de extração
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-1 pb-3">
+              {analysis_warnings.map((w, i) => (
+                <p key={i} className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {w}
+                </p>
+              ))}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       )}
 
       {/* Resumo */}
