@@ -18,8 +18,9 @@ type Analyse struct {
 	S3Key         string         `gorm:"type:text;not null"`
 	Model         string         `gorm:"type:text;default:'gpt-4o-mini'"`
 	PromptVersion string         `gorm:"type:text;default:'v1'"`
-	CharCount     *int           `gorm:"type:int"`
-	ResultJSON    datatypes.JSON `gorm:"type:jsonb"`
+	CharCount          *int           `gorm:"type:int"`
+	ExtractedTextS3Key *string        `gorm:"type:text"` // S3 key for the extracted TXT (enables LLM retry)
+	ResultJSON         datatypes.JSON `gorm:"type:jsonb"`
 	CreatedAt     time.Time      `gorm:"autoCreateTime"`
 	UpdatedAt     time.Time      `gorm:"autoUpdateTime"`
 	CompletedAt   *time.Time     `gorm:"type:timestamptz"`

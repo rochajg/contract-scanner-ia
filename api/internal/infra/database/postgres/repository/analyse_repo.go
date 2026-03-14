@@ -30,3 +30,29 @@ func (r *AnalyseRepoPostgres) Get(id uuid.UUID) (*models.Analyse, error) {
 func (r *AnalyseRepoPostgres) Update(analyse *models.Analyse) error {
 	return r.db.Save(analyse).Error
 }
+
+func (r *AnalyseRepoPostgres) List(limit int) ([]models.Analyse, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var analyses []models.Analyse
+	if err := r.db.Order("created_at DESC").Limit(limit).Find(&analyses).Error; err != nil {
+		return nil, err
+	}
+	return analyses, nil
+}
+
+func (r *AnalyseRepoPostgres) Delete(id uuid.UUID) error {
+	return r.db.Where("id = ?", id).Delete(&models.Analyse{}).Error
+}
+
+func (r *AnalyseRepoPostgres) ListByUser(userID string, limit int) ([]models.Analyse, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var analyses []models.Analyse
+	if err := r.db.Where("clerk_user_id = ?", userID).Order("created_at DESC").Limit(limit).Find(&analyses).Error; err != nil {
+		return nil, err
+	}
+	return analyses, nil
+}

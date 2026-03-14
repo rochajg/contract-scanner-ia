@@ -50,5 +50,6 @@ func (c *Client) Open() (*gorm.DB, error) {
 func (c *Client) Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&models.Analyse{},
+		&models.User{},
 	)
 }

@@ -4,37 +4,47 @@ import (
 	"net/http"
 	"os"
 
+	"contract-scanner/internal/middleware"
 	"contract-scanner/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 )
 
 type UploadHandler struct {
-	generatePresignedUrl usecase.IGeneratePresignedUrl
+	uploadPDF usecase.IUploadPDF
 }
 
-func NewUploadHandler(generatePresignedUrl usecase.IGeneratePresignedUrl) *UploadHandler {
-	return &UploadHandler{generatePresignedUrl: generatePresignedUrl}
+func NewUploadHandler(uploadPDF usecase.IUploadPDF) *UploadHandler {
+	return &UploadHandler{uploadPDF: uploadPDF}
 }
 
-type PresignRequest struct {
-	Filename    string `json:"filename" binding:"required"`
-	ContentType string `json:"content_type" binding:"required"`
-	SizeBytes   int64  `json:"size_bytes" binding:"required,gt=0"`
-}
-
-func (h *UploadHandler) Presign(c *gin.Context) {
-	var req PresignRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// Upload receives a PDF via multipart/form-data (field "file"), uploads it to S3
+// and creates an Analyse record. Returns the analysis_id to be used in /process.
+func (h *UploadHandler) Upload(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "field 'file' is required (multipart/form-data)"})
 		return
 	}
 
-	output, err := h.generatePresignedUrl.Execute(c.Request.Context(), usecase.PresignInput{
-		Filename:    req.Filename,
-		ContentType: req.ContentType,
-		SizeBytes:   req.SizeBytes,
-		ClerkUserID: "", // disabled for local testing
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open uploaded file"})
+		return
+	}
+	defer file.Close()
+
+	contentType := fileHeader.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/pdf"
+	}
+
+	output, err := h.uploadPDF.Execute(c.Request.Context(), usecase.UploadPDFInput{
+		Filename:    fileHeader.Filename,
+		ContentType: contentType,
+		SizeBytes:   fileHeader.Size,
+		FileBody:    file,
+		ClerkUserID: middleware.GetUserID(c),
 		Model:       os.Getenv("LLM_MODEL"),
 	})
 	if err != nil {

@@ -4,12 +4,18 @@ import (
 	"net/http"
 
 	"contract-scanner/internal/handler"
+	"contract-scanner/internal/infra/auth"
 	"contract-scanner/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
-func Routes(uploadHandler *handler.UploadHandler, analyseHandler *handler.AnalyseHandler) *gin.Engine {
+func Routes(
+	uploadHandler *handler.UploadHandler,
+	analyseHandler *handler.AnalyseHandler,
+	authHandler *handler.AuthHandler,
+	jwtSvc auth.JWTService,
+) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/health", func(c *gin.Context) {
@@ -17,16 +23,30 @@ func Routes(uploadHandler *handler.UploadHandler, analyseHandler *handler.Analys
 	})
 
 	api := r.Group("/api")
-	api.Use(middleware.ClerkAuth())
 	{
-		uploads := api.Group("/uploads")
+		// Public auth routes
+		authGroup := api.Group("/auth")
 		{
-			uploads.POST("/presign", uploadHandler.Presign)
+			authGroup.POST("/register", authHandler.Register)
+			authGroup.POST("/login", authHandler.Login)
+			authGroup.GET("/me", middleware.JWTAuth(jwtSvc), authHandler.Me)
 		}
 
-		analyses := api.Group("/analyses")
+		// Protected routes
+		protected := api.Group("")
+		protected.Use(middleware.JWTAuth(jwtSvc))
 		{
-			analyses.POST("/:id/process", analyseHandler.Process)
+			uploads := protected.Group("/uploads")
+			{
+				uploads.POST("", uploadHandler.Upload)
+			}
+
+			analyses := protected.Group("/analyses")
+			{
+				analyses.GET("", analyseHandler.List)
+				analyses.POST("/:id/process", analyseHandler.Process)
+				analyses.DELETE("/:id", analyseHandler.Delete)
+			}
 		}
 	}
 

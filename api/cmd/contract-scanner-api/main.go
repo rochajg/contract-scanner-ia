@@ -9,8 +9,9 @@ import (
 	"contract-scanner/internal/handler"
 	postgres "contract-scanner/internal/infra/database/postgres"
 	"contract-scanner/internal/infra/database/postgres/repository"
+	"contract-scanner/internal/infra/auth"
 	"contract-scanner/internal/infra/llm"
-	"contract-scanner/internal/infra/pdf"
+	"contract-scanner/internal/infra/pdf/pdfpipeline"
 	"contract-scanner/internal/infra/storage"
 	"contract-scanner/internal/usecase"
 
@@ -55,8 +56,11 @@ func main() {
 	)
 
 	analyseRepo := repository.NewAnalyseRepo(db)
+	userRepo := repository.NewUserRepo(db)
 
-	pdfExtractor := pdf.NewPdfCpuExtractor()
+	jwtSvc := auth.NewJWTService()
+
+	pdfExtractor := pdfpipeline.NewPipelineExtractor()
 	openaiClient := llm.NewOpenAIClient(llm.ClientConfig{
 		APIKey:       os.Getenv("LLM_API_KEY"),
 		BaseURL:      os.Getenv("LLM_BASE_URL"),
@@ -64,13 +68,18 @@ func main() {
 		SystemPrompt: systemPrompt,
 	})
 
-	generatePresignedUrl := usecase.NewGeneratePresignedUrl(analyseRepo, s3Client)
+	uploadPDF := usecase.NewUploadPDF(analyseRepo, s3Client)
 	processContract := usecase.NewProcessContract(analyseRepo, s3Client, pdfExtractor, openaiClient)
+	listAnalyses := usecase.NewListAnalyses(analyseRepo)
+	deleteAnalysis := usecase.NewDeleteAnalysis(analyseRepo, s3Client)
+	registerUser := usecase.NewRegisterUser(userRepo, jwtSvc)
+	loginUser := usecase.NewLoginUser(userRepo, jwtSvc)
 
-	uploadHandler := handler.NewUploadHandler(generatePresignedUrl)
-	analyseHandler := handler.NewAnalyseHandler(processContract)
+	uploadHandler := handler.NewUploadHandler(uploadPDF)
+	analyseHandler := handler.NewAnalyseHandler(processContract, listAnalyses, deleteAnalysis)
+	authHandler := handler.NewAuthHandler(registerUser, loginUser)
 
-	r := config.Routes(uploadHandler, analyseHandler)
+	r := config.Routes(uploadHandler, analyseHandler, authHandler, jwtSvc)
 
 	log.Println("server running on :8080")
 	if err := r.Run(":8080"); err != nil {

@@ -84,7 +84,7 @@ func (o *OpenAIClient) AnalyzeContract(ctx context.Context, text string) (json.R
 			{Role: openai.ChatMessageRoleSystem, Content: o.systemPrompt},
 			{Role: openai.ChatMessageRoleUser, Content: text},
 		},
-		Temperature: 0.2,
+		Temperature: 0.7,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai request failed: %w", err)
